@@ -1,14 +1,17 @@
 <template>
   <div id="app">
-    <div id="nav">
+    <div class="nav">
       <router-link to="/about">BarChart1</router-link> |
-      <router-link to="/BarChart">BarChart2</router-link>
+      <router-link to="/Chart">Chart</router-link> |
+      <router-link to="/BubblePlot">BubblePlot</router-link> |
+      <router-link to="/Map">Map</router-link>
     </div>
     <router-view />
   </div>
 </template>
 
 <style lang="scss">
+@import "@/assets/all.scss";
 #app {
   font-family: "Avenir", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -17,8 +20,8 @@
   color: #2c3e50;
 }
 
-#nav {
-  padding: 30px;
+.nav {
+  padding: 10px;
 
   a {
     font-weight: bold;

@@ -1,0 +1,38 @@
+// 改變 y 座標 tick 顏色
+.y-axis .tick line {
+  stroke: #e8e8e8;
+}
+// 隱藏偶數條 tick
+.y-axis .tick:nth-child(even) {
+  display: none;
+}
+// 隱藏座標的數值
+.y-axis text {
+  display: none;
+}
+// 隱藏 y 座標
+.y-axis .domain {
+  display: none;
+}
+.tooltip-wrapper {
+  border-radius: 4px;
+  width: 102px;
+  height: 34px;
+  background: #f9f9f9;
+  box-shadow: 0 2px 9px 0 rgba(0, 0, 0, 0.3);
+  position: absolute;
+  top: 0px;
+  align-items: center;
+  padding-left: 15px;
+}
+.tooltip-wrapper .circle {
+  border-radius: 50%;
+  height: 11px;
+  width: 11px;
+  background-color: #0990ca;
+}
+.tooltip-wrapper .data {
+  font-size: 12px;
+  color: #7e7e7e;
+  margin-left: 10px;
+}
