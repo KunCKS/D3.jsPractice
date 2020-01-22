@@ -3,6 +3,14 @@
     <svg width="500" height="500" style="border: 1px solid #00000060">
       <g class="counties" />
       <path class="county-borders" />
+      <g
+        class="sites"
+        v-for="(site, i) in govSite"
+        :key="i"
+        :transform="`translate(${site.lng}, ${site.lat})`"
+      >
+        <circle r="2" :id="`site-${i}`" class="siteCircle" />
+      </g>
     </svg>
   </div>
 </template>
@@ -20,8 +28,8 @@ export default {
       MapData: undefined,
       population:
         "/1-1+土地面積、戶數、人口數、人口密度、年齡結構及扶養比例.csv",
-      // population2:
-      //   "/1-2+土地面積、戶數、人口數、人口密度、年齡結構及扶養比例按主要都市分.csv",
+      govSite_url: "/各縣市位置.csv",
+      govSite: "",
       zoneData: ""
       // abc: [1, 2, 3, 4, 5, 6, 7, 8, 9],
       // bbc: [2, 2, 2, 2, 2, 2, 2, 2]
@@ -124,6 +132,36 @@ export default {
       // // eslint-disable-next-line no-console
       // console.log("MapData_Area", MapData_Area);
 
+      // test
+      // eslint-disable-next-line no-console
+      console.log("geoMap", geoMap([121.6739, 24.91571]));
+
+      // test
+
+      // 標定各縣市政府位置
+      let govSite_rawData = [];
+      await d3
+        .csv(vm.govSite_url, d => {
+          return {
+            county: d["縣市"],
+            lng: d["經度"],
+            lat: d["緯度"]
+          };
+        })
+        .then(res => {
+          govSite_rawData = res;
+        });
+      vm.govSite = govSite_rawData.map(d => {
+        let formatSite = geoMap([d.lng, d.lat]);
+        return {
+          county: d.county,
+          lng: formatSite[0],
+          lat: formatSite[1]
+        };
+      });
+      // eslint-disable-next-line no-console
+      console.log(vm.govSite);
+
       // ScaleLinear 設定密度與顏色的對應範圍
       // 這邊要注意陣列中是否有不需要的資料，否則 d3.max() or extent() 處理下去會不管資料是否需要，直接依最大值或會小值去拉
       const densityColor = d3
@@ -208,5 +246,9 @@ export default {
   border-radius: 5px;
   opacity: 0.9;
   position: absolute;
+}
+.siteCircle {
+  fill: rgb(182, 242, 231);
+  cursor: pointer;
 }
 </style>
