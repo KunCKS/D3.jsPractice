@@ -1,5 +1,5 @@
 <template>
-  <div :id="`geoMap-${id}`">
+  <div :id="`geoMap-${id}`" style="position:relative">
     <svg width="500" height="500" style="border: 1px solid #00000060">
       <g class="counties" />
       <path class="county-borders" />
@@ -18,7 +18,7 @@ export default {
       id: shortid.generate(),
       DataAPI: "/COUNTY_MOI_1081121topo.json",
       MapData: undefined,
-      population1:
+      population:
         "/1-1+土地面積、戶數、人口數、人口密度、年齡結構及扶養比例.csv",
       // population2:
       //   "/1-2+土地面積、戶數、人口數、人口密度、年齡結構及扶養比例按主要都市分.csv",
@@ -71,10 +71,19 @@ export default {
         .scale(6000);
 
       //由於 MapData 取得的是 topojson 格式，所以需要夠過插件來做解析才能畫地圖
-      // eslint-disable-next-line no-console
-      console.log(
-        topojson.feature(vm.MapData, vm.MapData.objects["COUNTY_MOI_1081121"])
+      let MapData_Area = topojson.feature(
+        vm.MapData,
+        vm.MapData.objects["COUNTY_MOI_1081121"]
       );
+      const MapData_Border = topojson.mesh(
+        vm.MapData,
+        vm.MapData.objects["COUNTY_MOI_1081121"]
+      );
+      // eslint-disable-next-line no-console
+      console.log("解析topojson feature", MapData_Area);
+      // eslint-disable-next-line no-console
+      console.log("解析topojson mesh", MapData_Border);
+
       // // 生成地區名稱資料
       // const counties = topojson
       //   .feature(vm.MapData, vm.MapData.objects["COUNTY_MOI_1081121"])
@@ -84,12 +93,13 @@ export default {
       // // eslint-disable-next-line no-console
       // console.log("counties", counties);
 
-      // 取得csv資料，與地圖資料合併
+      // 取得 csv資料，與 topojson 地圖資料合併
       // 這邊要注意，因為 csv 使用 Promise，若直接非同步處理，會造成 population 因 csv 還未完成取得，
-      // 後面函式直接取用時 population 還未完成，造成它實際是取到空值，無法進行資料處理。
+      // 後面函式直接取用 population 時還未完成，造成它實際是取到空值，無法進行資料處理。
+      // 所以要用 await 同步語法來等待 csv 資料處理完畢再做後續的資料渲染
       let population = [];
       await d3
-        .csv(vm.population1, d => {
+        .csv(vm.population, d => {
           return {
             county: d["地區"],
             population: d["年底人口數"],
@@ -99,13 +109,9 @@ export default {
         .then(res => {
           population = res;
         });
-      let formatMapData = topojson.feature(
-        vm.MapData,
-        vm.MapData.objects["COUNTY_MOI_1081121"]
-      );
 
-      // 這邊將地圖資料透過陣列函式與csv資料做比對並找到符合的資料後來新增人口密度與人口數
-      formatMapData.features.forEach(d => {
+      // 這邊將 topojson 地圖資料透過陣列函式與 csv資料做比對後找到對應的資料後(如 topojson的台中市對上 csv的台中市)來新增人口密度與人口數的屬性
+      MapData_Area.features.forEach(d => {
         population.forEach(e => {
           if (d.properties.COUNTYNAME === e.county) {
             d.properties.density = e.density;
@@ -116,31 +122,71 @@ export default {
       // // eslint-disable-next-line no-console
       // console.log("population", population);
       // // eslint-disable-next-line no-console
-      // console.log("formatMapData", formatMapData);
+      // console.log("MapData_Area", MapData_Area);
 
-      //
+      // ScaleLinear 設定密度與顏色的對應範圍
+      // 這邊要注意陣列中是否有不需要的資料，否則 d3.max() or extent() 處理下去會不管資料是否需要，直接依最大值或會小值去拉
+      const densityColor = d3
+        .scaleLinear()
+        .domain(
+          // d3.min(
+          //   MapData_Area.features.map(d => Number(d.properties.population))
+          // ),
+          // d3.max(
+          //   MapData_Area.features.map(d => Number(d.properties.population))
+          // )
+          // extent 可以直接 return [d3.min, d3.max]
+          d3.extent(
+            MapData_Area.features.map(d => Number(d.properties.population)) // 注意資料的型別，因為原始資料為字串，這邊要轉為數值型別
+          )
+        )
+        .range(["#00BD00", "#D90000"]);
 
       const geoPath = d3.geoPath(geoMap);
       d3.select("g.counties")
         .selectAll("path")
-        .data(formatMapData.features)
+        .data(MapData_Area.features)
         .enter()
         .append("path")
-        .attr("d", geoPath);
-      d3.select("path.county-borders").attr(
-        "d",
-        geoPath(
-          topojson.mesh(vm.MapData, vm.MapData.objects["COUNTY_MOI_1081121"])
-        )
-      );
+        .attr("d", geoPath)
+        .attr("fill", d => densityColor(Number(d.properties.population)))
+        .on("mousemove", d => {
+          let mouse = d3
+            .mouse(d3.select(`#geoMap-${vm.id} svg`).node())
+            .map(e => {
+              return parseInt(e);
+            });
+          // let elWidth = parseFloat(
+          //   d3.select(`#geoMap-${vm.id} .tooltip`).node().offsetWidth
+          // );
+          tooltip
+            .classed("hidden", false)
+            .attr("style", `left:${mouse[0]}px;top:${mouse[1] - 50}px`)
+            .html(
+              `${d.properties.COUNTYNAME}人口數為 ${d.properties.population}`
+            );
+          // // eslint-disable-next-line no-console
+          // console.log(
+          //   parseFloat(d3.select(`#geoMap-${vm.id} .tooltip`).style("width"))
+          // );
+        })
+        .on("mouseout", () => {
+          tooltip.classed("hidden", true);
+        });
+      d3.select("path.county-borders").attr("d", geoPath(MapData_Border));
+      // 建立 tooltip tag
+      const tooltip = d3
+        .select(`#geoMap-${vm.id}`)
+        .append("div")
+        .attr("class", "hidden tooltip");
     }
   }
 };
 </script>
 <style lang="scss">
-.counties {
-  fill: #547480;
-}
+// .counties {
+//   fill: #547480;
+// }
 .counties :hover {
   fill: #6c858e;
   transition: 0.1s;
@@ -149,5 +195,18 @@ export default {
   fill: none;
   stroke: #fff;
   stroke-width: 0.5px;
+}
+.hidden {
+  display: none;
+}
+.tooltip {
+  color: #222;
+  background-color: #fff;
+  padding: 0.5em;
+  text-shadow: #f5f5f5 0 1px 0;
+  border: 1px solid #000000;
+  border-radius: 5px;
+  opacity: 0.9;
+  position: absolute;
 }
 </style>
